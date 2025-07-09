@@ -61,8 +61,8 @@ export class PcfParser {
 
     _parseUnits(lines) {
         console.log('Parsing UNITS section');
-        const scaleMap = { MM: 0.001, CM: 0.01, M: 1, IN: 0.0254, FT: 0.3048 };
-        let boreUnit = '', coordUnit = '';
+        const scaleMap = { MM: 0.001, CM: 0.01, M: 1, IN: 0.0254, INCH: 0.0254, FT: 0.3048, KGS: 1, LBS: 0.453592};
+        let boreUnit = '', coordUnit = '', boltDiaUnit = '', boltLenUnit = '', weightUnit = '';
         lines.forEach(raw => {
             const trimmed = raw.trim();
             if (!trimmed) return;
@@ -75,8 +75,20 @@ export class PcfParser {
                 coordUnit = trimmed.split(/\s+/)[1]?.toUpperCase() || '';
                 console.log('Found UNITS-CO-ORDS:', coordUnit);
             }
+            if (upper.startsWith('UNITS-BOLT-DIA')) {
+                boltDiaUnit = trimmed.split(/\s+/)[1]?.toUpperCase() || '';
+                console.log('Found UNITS-BOLT-DIA:', boltDiaUnit);
+            }
+            if (upper.startsWith('UNITS-BOLT-LENGTH')) {
+                boltLenUnit = trimmed.split(/\s+/)[1]?.toUpperCase() || '';
+                console.log('Found UNITS-BOLT-LENGTH:', boltLenUnit);
+            }
+            if (upper.startsWith('UNITS-WEIGHT')) {
+                weightUnit = trimmed.split(/\s+/)[1]?.toUpperCase() || '';
+                console.log('Found UNITS-WEIGHT:', weightUnit);
+            }
         });
-        const units = { boreUnit, coordUnit, boreScale: scaleMap[boreUnit] || 1, coordScale: scaleMap[coordUnit] || 1 };
+        const units = { boreUnit, coordUnit, boreScale: scaleMap[boreUnit] || 1, coordScale: scaleMap[coordUnit] || 1, boltDiaUnit, boltLenUnit, weightUnit, weightScale: scaleMap[weightUnit] || 1 };
         console.log('Units parsed with scales:', units);
         return units;
     }
