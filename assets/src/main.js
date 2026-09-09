@@ -18,7 +18,20 @@ window.addEventListener('pcf-url', async (e) => {
         }
         if (!url) return;
 
-        const buffer = await fetch(url).then(r => r.arrayBuffer());
+        const isLoopback = /^http:\/\/127\.0\.0\.1:\d+\//.test(url);
+        const request = isLoopback
+            ? new Request(url, {
+                mode: 'cors',
+                cache: 'no-store',
+                targetAddressSpace: 'loopback'
+            })
+            : new Request(url);
+        const response = await fetch(request);
+        if (!response.ok) {
+            throw new Error(`PCF could not be loaded (${response.status}).`);
+        }
+
+        const buffer = await response.arrayBuffer();
         const text = new TextDecoder('utf-8').decode(buffer);
         const parsed = new PcfParser(text).parse();
 
@@ -30,6 +43,16 @@ window.addEventListener('pcf-url', async (e) => {
     }
     catch (err) {
         console.error('Error loading PCF:', err);
+        const card = document.querySelector('.drop-card');
+        if (card) card.classList.remove('hidden');
+
+        const infoBox = document.getElementById('infoBox');
+        if (infoBox) {
+            infoBox.textContent = 'The PCF could not be loaded. Allow local network access for this site and try again.';
+            infoBox.style.left = '16px';
+            infoBox.style.top = '16px';
+            infoBox.style.display = 'block';
+        }
     }
     finally {
         builder.ui.hideSpinner();
@@ -62,6 +85,49 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }));
     }
+
+    // R2P passes a short-lived, token-protected loopback URL to the online viewer.
+    function loadPcfFromQuery() {
+        const params = new URLSearchParams(window.location.search);
+        const sourceUrl = params.get('pcf');
+        if (!sourceUrl) return;
+
+        let source;
+        try {
+            source = new URL(sourceUrl);
+        }
+        catch {
+            console.warn('Ignored invalid PCF source URL.');
+            return;
+        }
+
+        const validSource = source.protocol === 'http:'
+            && source.hostname === '127.0.0.1'
+            && /^\d+$/.test(source.port)
+            && /^\/[0-9a-f]{32}$/i.test(source.pathname);
+        if (!validSource) {
+            console.warn('Ignored PCF source outside the R2P loopback bridge.');
+            return;
+        }
+
+        const fileName = (params.get('name') || 'R2P export.pcf')
+            .replace(/[<>&\"'`]/g, '_')
+            .slice(0, 260);
+        sideMenu.innerHTML = '';
+        card.classList.add('hidden');
+        spinnerText.textContent = `Generate ${fileName}…`;
+
+        // Do not retain the short-lived source token in the browser history.
+        history.replaceState(null, '', `${location.pathname}${location.hash}`);
+        window.dispatchEvent(new CustomEvent('pcf-url', {
+            detail: {
+                url: source.href,
+                name: fileName
+            }
+        }));
+    }
+
+    loadPcfFromQuery();
 
     // Load the sample PCF from repo path
     sampleBtn.addEventListener('click', () => {
